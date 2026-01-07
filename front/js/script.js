@@ -145,10 +145,34 @@ function createCarCard(car) {
 	seeMoreLink.className = "btn btn-primary";
 	seeMoreLink.textContent = "See more";
 
+	// Créer le bouton "Supprimer"
+	const deleteButton = document.createElement("button");
+	deleteButton.className = "btn btn-danger btn-sm";
+	deleteButton.textContent = "Supprimer";
+	deleteButton.setAttribute("data-car-id", id);
+	deleteButton.setAttribute("aria-label", `Supprimer ${brand} ${model}`);
+	deleteButton.type = "button"; // Empêcher la soumission de formulaire
+	deleteButton.setAttribute("data-car-id", id);
+	deleteButton.setAttribute("aria-label", `Supprimer ${brand} ${model}`);
+	deleteButton.type = "button"; // Empêcher la soumission de formulaire
+	
+	// Debug : vérifier que le bouton est créé
+	if (!id || id === "") {
+		console.warn("⚠️ Attention : Voiture sans ID, le bouton de suppression ne fonctionnera pas", car);
+	}
+
+	// Créer un conteneur pour les boutons avec un style visible
+	const buttonContainer = document.createElement("div");
+	buttonContainer.className = "button-container";
+	buttonContainer.appendChild(seeMoreLink);
+	buttonContainer.appendChild(deleteButton);
+	
+	console.log(`✅ Carte créée avec bouton Supprimer pour voiture ID: ${id}, Brand: ${brand}, Model: ${model}`);
+
 	// Ajouter les éléments au corps de la carte
 	cardBody.appendChild(title);
 	cardBody.appendChild(descriptionText);
-	cardBody.appendChild(seeMoreLink);
+	cardBody.appendChild(buttonContainer);
 
 	// 5. Assembler le tout : ajouter le lien image et le corps à l'article
 	article.appendChild(imageLink);
@@ -385,8 +409,65 @@ function clearAlerts() {
 }
 
 // ============================================
-// FONCTIONS API - CRÉATION DE VOITURE
+// FONCTIONS API - CRÉATION ET SUPPRESSION DE VOITURE
 // ============================================
+
+/**
+ * Supprime une voiture via l'API
+ * @param {number|string} carId - ID de la voiture à supprimer
+ * @returns {Promise<boolean>} - true si succès, false sinon
+ */
+async function deleteCar(carId) {
+	try {
+		const url = `${API_CONFIG.BASE_URL}/api/cars/${carId}`;
+		console.log("Suppression de la voiture ID:", carId);
+
+		const response = await fetchWithAuth(url, {
+			method: 'DELETE'
+		});
+
+		console.log("Status de la réponse:", response.status, response.statusText);
+
+		if (!response.ok) {
+			if (response.status === 404) {
+				console.warn("La voiture n'existe déjà plus (404)");
+				// On considère ça comme un succès car l'objectif est atteint (la voiture n'existe plus)
+				return true;
+			} else if (response.status === 401 || response.status === 403) {
+				throw new Error("Non autorisé: Vérifiez votre clé API");
+			} else if (response.status === 500) {
+				throw new Error("Erreur serveur (500)");
+			} else {
+				let errorMessage = `Erreur HTTP: ${response.status}`;
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorData.message || errorMessage;
+				} catch (e) {
+					// Si on ne peut pas parser le JSON, utiliser le message par défaut
+				}
+				throw new Error(errorMessage);
+			}
+		}
+
+		// La réponse peut être vide (204 No Content) ou contenir un message
+		if (response.status === 204 || response.status === 200) {
+			console.log("✅ Voiture supprimée avec succès");
+			return true;
+		}
+
+		return true;
+	} catch (error) {
+		console.error('Erreur lors de la suppression de la voiture:', error);
+		
+		// Gérer les erreurs réseau
+		if (error instanceof TypeError && error.message.includes("fetch")) {
+			throw new Error("Erreur réseau: Impossible de contacter le serveur. Vérifiez votre connexion internet.");
+		}
+		
+		// Propager les autres erreurs
+		throw error;
+	}
+}
 
 /**
  * Crée une nouvelle voiture via l'API
@@ -600,6 +681,118 @@ window.handleFormSubmitGlobal = window._handleFormSubmitModule;
 console.log("✅ Module script.js chargé, _handleFormSubmitModule disponible");
 
 // ============================================
+// GESTION DE LA SUPPRESSION
+// ============================================
+
+// Variable pour stocker temporairement l'ID de la voiture à supprimer
+let carToDelete = null;
+let deleteButtonElement = null;
+
+/**
+ * Gère la demande de suppression (ouvre le modal de confirmation)
+ * @param {string} carId - ID de la voiture à supprimer
+ * @param {HTMLElement} button - Bouton de suppression cliqué
+ */
+function handleDeleteRequest(carId, button) {
+	carToDelete = carId;
+	deleteButtonElement = button;
+	
+	// Récupérer les informations de la voiture depuis la carte
+	const card = button.closest('.card');
+	const title = card ? card.querySelector('.card-title')?.textContent : '';
+	
+	// Mettre à jour le message de confirmation
+	const deleteCarInfo = document.getElementById('deleteCarInfo');
+	if (deleteCarInfo && title) {
+		deleteCarInfo.textContent = `Voiture : ${title}`;
+	}
+	
+	// Ouvrir le modal de confirmation
+	const confirmModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+	confirmModal.show();
+}
+
+/**
+ * Effectue la suppression après confirmation
+ */
+async function confirmDelete() {
+	if (!carToDelete || !deleteButtonElement) {
+		console.error("Aucune voiture à supprimer");
+		return;
+	}
+	
+	const confirmBtn = document.getElementById('confirmDeleteBtn');
+	const spinner = confirmBtn?.querySelector('.spinner-border');
+	
+	try {
+		// Désactiver le bouton et afficher le spinner
+		if (confirmBtn) {
+			confirmBtn.disabled = true;
+			if (spinner) spinner.classList.remove('d-none');
+		}
+		
+		// Effectuer la suppression via l'API
+		const success = await deleteCar(carToDelete);
+		
+		if (success) {
+			// Supprimer la carte de l'interface
+			const card = deleteButtonElement.closest('.card');
+			if (card) {
+				// Animation de fade out avant suppression
+				card.style.transition = 'opacity 0.3s ease-out';
+				card.style.opacity = '0';
+				setTimeout(() => {
+					card.remove();
+					
+					// Vérifier s'il reste des voitures
+					const container = document.querySelector('.card-cont');
+					if (container && container.children.length === 0) {
+						// Afficher un message si plus aucune voiture
+						container.innerHTML = `
+							<div class="alert alert-info w-100" role="alert">
+								<h4 class="alert-heading">Aucune voiture disponible</h4>
+								<p class="mb-0">Aucune voiture n'est actuellement disponible dans le catalogue.</p>
+							</div>
+						`;
+					}
+				}, 300);
+			}
+			
+			// Fermer le modal
+			const modal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
+			if (modal) modal.hide();
+			
+			// Afficher un message de succès (optionnel, via toast ou notification)
+			console.log("✅ Voiture supprimée avec succès");
+		}
+	} catch (error) {
+		console.error('Erreur lors de la suppression:', error);
+		
+		// Réactiver le bouton
+		if (confirmBtn) {
+			confirmBtn.disabled = false;
+			if (spinner) spinner.classList.add('d-none');
+		}
+		
+		// Afficher l'erreur dans le modal
+		const modalBody = document.querySelector('#confirmDeleteModal .modal-body');
+		if (modalBody) {
+			let errorAlert = modalBody.querySelector('.alert-danger');
+			if (!errorAlert) {
+				errorAlert = document.createElement('div');
+				errorAlert.className = 'alert alert-danger mt-3';
+				modalBody.appendChild(errorAlert);
+			}
+			errorAlert.textContent = `Erreur : ${error.message}`;
+		}
+	} finally {
+		// Réinitialiser les variables
+		carToDelete = null;
+		deleteButtonElement = null;
+	}
+}
+
+// ============================================
 // INITIALISATION
 // ============================================
 
@@ -650,6 +843,63 @@ document.addEventListener("DOMContentLoaded", () => {
 						handleFormSubmit(e);
 					});
 				}
+			}
+		});
+	}
+
+	// ============================================
+	// EVENT DELEGATION POUR LA SUPPRESSION
+	// ============================================
+	
+	// Utiliser la délégation d'événements pour gérer les clics sur les boutons de suppression
+	// Cela fonctionne même pour les cartes créées dynamiquement
+	const cardContainer = document.querySelector('.card-cont');
+	if (cardContainer) {
+		cardContainer.addEventListener('click', function(e) {
+			// Vérifier si le clic est sur un bouton de suppression
+			const deleteBtn = e.target.closest('button[data-car-id]');
+			if (deleteBtn) {
+				e.preventDefault();
+				e.stopPropagation();
+				const carId = deleteBtn.getAttribute('data-car-id');
+				console.log('🗑️ Demande de suppression pour la voiture ID:', carId);
+				handleDeleteRequest(carId, deleteBtn);
+			}
+		});
+		console.log('✅ Event delegation configurée pour les boutons de suppression');
+	}
+
+	// ============================================
+	// BOUTON DE CONFIRMATION DU MODAL
+	// ============================================
+	
+	// Attacher l'événement sur le bouton de confirmation du modal
+	const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+	if (confirmDeleteBtn) {
+		confirmDeleteBtn.addEventListener('click', confirmDelete);
+		console.log('✅ Bouton de confirmation de suppression configuré');
+	}
+
+	// Réinitialiser les variables quand le modal de suppression est fermé
+	const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+	if (confirmDeleteModal) {
+		confirmDeleteModal.addEventListener('hidden.bs.modal', function() {
+			// Réinitialiser les variables
+			carToDelete = null;
+			deleteButtonElement = null;
+			
+			// Supprimer les messages d'erreur
+			const errorAlert = this.querySelector('.alert-danger');
+			if (errorAlert) {
+				errorAlert.remove();
+			}
+			
+			// Réactiver le bouton de confirmation
+			const confirmBtn = document.getElementById('confirmDeleteBtn');
+			if (confirmBtn) {
+				confirmBtn.disabled = false;
+				const spinner = confirmBtn.querySelector('.spinner-border');
+				if (spinner) spinner.classList.add('d-none');
 			}
 		});
 	}

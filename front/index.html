@@ -38,23 +38,162 @@
 		<link rel="icon" href="./imgs/favicon.ico" />
 		<meta name="theme-color" content="#7952b3" />
 		<style>
+			/* Styles pour les cartes de voitures */
 			.card {
 				width: 32.5%;
 				min-width: 355px;
+				border: none;
+				border-radius: 12px;
+				overflow: hidden;
+				transition: transform 0.3s ease, box-shadow 0.3s ease;
+				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 			}
+			
+			.card:hover {
+				transform: translateY(-5px);
+				box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+			}
+			
 			.card img {
 				min-width: 410px;
 				transition: all 250ms ease-in-out;
+				object-fit: cover;
 			}
+			
 			.card img:hover {
 				min-width: 480px;
+				transform: scale(1.05);
 			}
+			
 			.card a:first-child {
 				overflow: hidden;
 				display: flex;
 				align-items: center;
 				justify-content: center;
 				height: 235px;
+				background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+			}
+			
+			.card-body {
+				padding: 1.25rem;
+				background: #fff;
+			}
+			
+			.card-title {
+				font-size: 1.25rem;
+				font-weight: 600;
+				margin-bottom: 0.75rem;
+				color: #2c3e50;
+			}
+			
+			.card-text {
+				font-size: 0.9rem;
+				color: #6c757d;
+				margin-bottom: 1rem;
+				line-height: 1.5;
+				min-height: 3em;
+			}
+			
+			/* Styles pour les boutons - Styles Bootstrap de base */
+			.button-container .btn {
+				font-size: 0.875rem;
+				padding: 0.375rem 0.75rem;
+			}
+			
+			.button-container .btn-primary {
+				color: #000000 !important;
+			}
+			
+			.button-container .btn-primary:hover {
+				color: #000000 !important;
+			}
+			
+			/* Conteneur de boutons */
+			.button-container {
+				display: flex;
+				gap: 0.5rem;
+				margin-top: 0.75rem;
+			}
+			
+			/* Section principale */
+			.card-cont {
+				padding: 2rem 0;
+				min-height: 60vh;
+			}
+			
+			/* Header amélioré */
+			.navbar {
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+				background: #fff !important;
+			}
+			
+			.navbar-brand {
+				font-weight: 600;
+				font-size: 1.3rem;
+				color: #2c3e50 !important;
+			}
+			
+			/* Titre principal */
+			h1 {
+				font-weight: 700;
+				color: #2c3e50;
+				margin-bottom: 2rem;
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			}
+			
+			/* Bouton flottant "Add car" */
+			.position-fixed.bottom-0.end-0 {
+				border-radius: 50px;
+				padding: 0.75rem 1.5rem;
+				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+				font-weight: 600;
+				z-index: 1000;
+			}
+			
+			.position-fixed.bottom-0.end-0:hover {
+				box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+				transform: translateY(-2px);
+			}
+			
+			/* Modal amélioré */
+			.modal-content {
+				border-radius: 12px;
+				border: none;
+				box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+			}
+			
+			.modal-header {
+				border-bottom: 1px solid #e9ecef;
+				padding: 1.5rem;
+			}
+			
+			.modal-body {
+				padding: 1.5rem;
+			}
+			
+			.modal-footer {
+				border-top: 1px solid #e9ecef;
+				padding: 1rem 1.5rem;
+			}
+			
+			/* Form inputs */
+			.form-control {
+				border-radius: 6px;
+				border: 1px solid #dee2e6;
+				padding: 0.5rem 0.75rem;
+				transition: all 0.2s ease;
+			}
+			
+			.form-control:focus {
+				border-color: #667eea;
+				box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+			}
+			
+			/* Alerte vide */
+			.alert-info {
+				border-radius: 8px;
+				border: none;
+				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 			}
 		</style>
 	</head>
@@ -98,9 +237,9 @@
 				</div>
 			</nav>
 		</header>
-		<main>
+		<main style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 2rem 0;">
 			<div class="container">
-				<h1 class="text-center mt-4">Classic cars</h1>
+				<h1 class="text-center mt-4 mb-5">Classic Cars Collection</h1>
 				<section
 					class="card-cont d-flex flex-wrap justify-content-center gap-3"
 				>
@@ -229,6 +368,30 @@
 							</button>
 						</div>
 					</form>
+					</div>
+				</div>
+			</div>
+
+			<!-- Modal de confirmation de suppression -->
+			<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+				<div class="modal-dialog">
+					<div class="modal-content">
+						<div class="modal-header">
+							<h5 class="modal-title" id="confirmDeleteModalLabel">Confirmer la suppression</h5>
+							<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+						</div>
+						<div class="modal-body">
+							<p>Êtes-vous sûr de vouloir supprimer cette voiture ?</p>
+							<p class="text-muted small mb-0">Cette action est irréversible.</p>
+							<p id="deleteCarInfo" class="text-muted fst-italic mt-2"></p>
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+							<button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+								<span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+								Supprimer
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -472,6 +635,6 @@
 			})();
 		</script>
 		
-		<script type="module" src="./js/script.js"></script>
+		<script type="module" src="./js/script.js?v=6"></script>
 	</body>
 </html>
