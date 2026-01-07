@@ -346,7 +346,7 @@
 							<!-- URL de l'image -->
 							<div class="mb-3">
 								<label for="imageUrl" class="form-label">URL de l'image</label>
-								<input type="url" class="form-control" id="imageUrl" name="imageUrl" placeholder="https://exemple.com/image.jpg">
+								<input type="url" class="form-control" id="imageUrl" name="image_url" placeholder="https://exemple.com/image.jpg">
 								<div class="invalid-feedback">
 									Veuillez entrer une URL valide.
 								</div>
@@ -460,8 +460,8 @@
 					if (!carData.description || carData.description.trim() === '') {
 						delete carData.description;
 					}
-					if (!carData.imageUrl || carData.imageUrl.trim() === '') {
-						delete carData.imageUrl;
+					if (!carData.image_url || carData.image_url.trim() === '') {
+						delete carData.image_url;
 					}
 					
 					console.log('📤 Envoi des données à l\'API:', carData);
@@ -635,6 +635,6 @@
 			})();
 		</script>
 		
-		<script type="module" src="./js/script.js?v=7"></script>
+		<script type="module" src="./js/script.js?v=8"></script>
 	</body>
 </html>

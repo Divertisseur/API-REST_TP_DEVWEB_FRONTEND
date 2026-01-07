@@ -388,9 +388,9 @@ function validateCarData(data) {
 	}
 
 	// Vérifier l'URL de l'image si fournie
-	if (data.imageUrl && data.imageUrl.trim() !== '') {
+	if (data.image_url && data.image_url.trim() !== '') {
 		try {
-			new URL(data.imageUrl);
+			new URL(data.image_url);
 		} catch (e) {
 			errors.push('L\'URL de l\'image n\'est pas valide');
 		}
@@ -629,8 +629,8 @@ async function handleFormSubmit(event) {
 			if (!carData.description || carData.description.trim() === '') {
 				delete carData.description;
 			}
-			if (!carData.imageUrl || carData.imageUrl.trim() === '') {
-				delete carData.imageUrl;
+			if (!carData.image_url || carData.image_url.trim() === '') {
+				delete carData.image_url;
 			}
 
 			// 3. Valider les données
