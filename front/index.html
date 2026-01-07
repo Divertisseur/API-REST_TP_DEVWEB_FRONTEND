@@ -127,30 +127,108 @@
 			>
 				<div class="modal-dialog">
 					<div class="modal-content">
-						<div class="modal-header">
-							<h1 class="modal-title fs-5" id="exampleModalLabel">
-								Modal title
-							</h1>
-							<button
-								type="button"
-								class="btn-close"
-								data-bs-dismiss="modal"
-								aria-label="Close"
-							></button>
+					<div class="modal-header">
+						<h1 class="modal-title fs-5" id="exampleModalLabel">
+							Ajouter une voiture classique
+						</h1>
+						<button
+							type="button"
+							class="btn-close"
+							data-bs-dismiss="modal"
+							aria-label="Close"
+						></button>
+					</div>
+					<form id="addCarForm" novalidate onsubmit="return window.handleFormSubmitGlobal ? window.handleFormSubmitGlobal(event) : false;">
+						<div class="modal-body">
+							<!-- Zone d'alerte pour les erreurs globales -->
+							<div id="formErrorAlert" class="alert alert-danger d-none" role="alert"></div>
+							<div id="formSuccessAlert" class="alert alert-success d-none" role="alert"></div>
+
+							<!-- Marque -->
+							<div class="mb-3">
+								<label for="brand" class="form-label">Marque *</label>
+								<input type="text" class="form-control" id="brand" name="brand" required>
+								<div class="invalid-feedback">
+									Veuillez entrer une marque.
+								</div>
+							</div>
+
+							<!-- Modèle -->
+							<div class="mb-3">
+								<label for="model" class="form-label">Modèle *</label>
+								<input type="text" class="form-control" id="model" name="model" required>
+								<div class="invalid-feedback">
+									Veuillez entrer un modèle.
+								</div>
+							</div>
+
+							<!-- Année -->
+							<div class="mb-3">
+								<label for="year" class="form-label">Année *</label>
+								<input type="number" class="form-control" id="year" name="year" min="1900" max="2025" required>
+								<div class="invalid-feedback">
+									L'année doit être entre 1900 et 2025.
+								</div>
+							</div>
+
+							<!-- Couleur -->
+							<div class="mb-3">
+								<label for="color" class="form-label">Couleur *</label>
+								<input type="text" class="form-control" id="color" name="color" required>
+								<div class="invalid-feedback">
+									Veuillez entrer une couleur.
+								</div>
+							</div>
+
+							<!-- Prix -->
+							<div class="mb-3">
+								<label for="price" class="form-label">Prix (€) *</label>
+								<input type="number" class="form-control" id="price" name="price" min="0" step="0.01" required>
+								<div class="invalid-feedback">
+									Le prix doit être un nombre positif.
+								</div>
+							</div>
+
+							<!-- Kilométrage -->
+							<div class="mb-3">
+								<label for="mileage" class="form-label">Kilométrage *</label>
+								<input type="number" class="form-control" id="mileage" name="mileage" min="0" required>
+								<div class="invalid-feedback">
+									Le kilométrage doit être un nombre positif.
+								</div>
+							</div>
+
+							<!-- Description -->
+							<div class="mb-3">
+								<label for="description" class="form-label">Description</label>
+								<textarea class="form-control" id="description" name="description" rows="3"></textarea>
+							</div>
+
+							<!-- URL de l'image -->
+							<div class="mb-3">
+								<label for="imageUrl" class="form-label">URL de l'image</label>
+								<input type="url" class="form-control" id="imageUrl" name="imageUrl" placeholder="https://exemple.com/image.jpg">
+								<div class="invalid-feedback">
+									Veuillez entrer une URL valide.
+								</div>
+								<div class="form-text">
+									Optionnel. Si non renseigné, une image par défaut sera utilisée.
+								</div>
+							</div>
 						</div>
-						<div class="modal-body">...</div>
 						<div class="modal-footer">
 							<button
 								type="button"
 								class="btn btn-secondary"
 								data-bs-dismiss="modal"
 							>
-								Close
+								Annuler
 							</button>
-							<button type="button" class="btn btn-primary">
-								Save changes
+							<button type="button" class="btn btn-primary" id="submitButton">
+								Ajouter la voiture
 							</button>
 						</div>
+					</form>
 					</div>
 				</div>
 			</div>
@@ -164,6 +242,236 @@
 			integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
 			crossorigin="anonymous"
 		></script>
+		
+		<!-- Script inline pour intercepter le formulaire immédiatement -->
+		<script>
+			// File d'attente pour stocker les événements si le module n'est pas prêt
+			window._formSubmitQueue = [];
+			
+			// Fonction pour traiter la file d'attente
+			function processFormSubmitQueue() {
+				if (window._handleFormSubmitModule && window._formSubmitQueue.length > 0) {
+					console.log('📦 Traitement de la file d\'attente:', window._formSubmitQueue.length, 'événement(s)');
+					const events = window._formSubmitQueue.slice();
+					window._formSubmitQueue = [];
+					events.forEach(event => {
+						window._handleFormSubmitModule(event);
+					});
+				}
+			}
+			
+			// Fonction fallback pour soumettre directement si le module ne charge pas
+			async function submitFormFallback(event) {
+				console.log('⚠️ Utilisation de la fonction fallback pour soumettre le formulaire');
+				const form = event.target || document.getElementById('addCarForm');
+				if (!form) {
+					console.error('Formulaire non trouvé');
+					return;
+				}
+				
+				const submitButton = document.getElementById('submitButton');
+				const originalText = submitButton ? submitButton.textContent : '';
+				
+				// Désactiver le bouton
+				if (submitButton) {
+					submitButton.disabled = true;
+					submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Envoi en cours...';
+				}
+				
+				try {
+					// Effacer les alertes précédentes
+					const errorAlert = document.getElementById('formErrorAlert');
+					const successAlert = document.getElementById('formSuccessAlert');
+					if (errorAlert) errorAlert.classList.add('d-none');
+					if (successAlert) successAlert.classList.add('d-none');
+					
+					const formData = new FormData(form);
+					const carData = Object.fromEntries(formData);
+					
+					// Convertir les types
+					carData.year = parseInt(carData.year);
+					carData.price = parseFloat(carData.price);
+					carData.mileage = parseInt(carData.mileage);
+					
+					// Nettoyer les champs vides
+					if (!carData.description || carData.description.trim() === '') {
+						delete carData.description;
+					}
+					if (!carData.imageUrl || carData.imageUrl.trim() === '') {
+						delete carData.imageUrl;
+					}
+					
+					console.log('📤 Envoi des données à l\'API:', carData);
+					
+					// Envoyer directement à l'API
+					const response = await fetch('http://localhost:3000/api/cars', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Accept': 'application/json',
+							'x-api-key': 'ma-super-cle-api-2024'
+						},
+						body: JSON.stringify(carData)
+					});
+					
+					console.log('📥 Réponse du serveur:', response.status, response.statusText);
+					
+					if (response.ok) {
+						const data = await response.json();
+						console.log('✅ Voiture créée avec succès:', data);
+						
+						// Afficher le message de succès
+						if (successAlert) {
+							successAlert.classList.remove('d-none');
+							successAlert.textContent = `✓ La voiture "${carData.brand} ${carData.model}" a été ajoutée avec succès !`;
+						}
+						
+						// Réinitialiser le formulaire
+						form.reset();
+						
+						// Fermer le modal après un court délai
+						setTimeout(() => {
+							const modal = bootstrap.Modal.getInstance(document.getElementById('exampleModal'));
+							if (modal) modal.hide();
+							// Recharger la page pour voir la nouvelle voiture
+							window.location.reload();
+						}, 1500);
+					} else {
+						let errorMessage = `Erreur HTTP: ${response.status}`;
+						try {
+							const errorData = await response.json();
+							errorMessage = errorData.error || errorData.message || errorMessage;
+						} catch (e) {
+							// Ignorer si on ne peut pas parser le JSON
+						}
+						
+						// Afficher l'erreur
+						if (errorAlert) {
+							errorAlert.classList.remove('d-none');
+							errorAlert.textContent = `Erreur: ${errorMessage}`;
+						}
+						
+						// Réactiver le bouton
+						if (submitButton) {
+							submitButton.disabled = false;
+							submitButton.textContent = originalText;
+						}
+					}
+				} catch (error) {
+					console.error('❌ Erreur:', error);
+					
+					// Afficher l'erreur
+					const errorAlert = document.getElementById('formErrorAlert');
+					if (errorAlert) {
+						errorAlert.classList.remove('d-none');
+						errorAlert.textContent = `Erreur réseau: ${error.message}`;
+					}
+					
+					// Réactiver le bouton
+					if (submitButton) {
+						submitButton.disabled = false;
+						submitButton.textContent = originalText;
+					}
+				}
+			}
+			
+			// Vérifier périodiquement si le module est chargé
+			function waitForModule(event, maxAttempts = 20) {
+				let attempts = 0;
+				const checkInterval = setInterval(() => {
+					attempts++;
+					if (window._handleFormSubmitModule && typeof window._handleFormSubmitModule === 'function') {
+						clearInterval(checkInterval);
+						console.log('✅ Module chargé après', attempts * 100, 'ms');
+						window._handleFormSubmitModule(event);
+						processFormSubmitQueue();
+					} else if (attempts >= maxAttempts) {
+						clearInterval(checkInterval);
+						console.warn('⚠️ Module non chargé après', maxAttempts * 100, 'ms, utilisation du fallback');
+						submitFormFallback(event);
+					}
+				}, 100);
+			}
+			
+			// Définir la fonction globale immédiatement
+			window.handleFormSubmitGlobal = function(event) {
+				console.log('🔵 handleFormSubmitGlobal appelée (version inline)');
+				event.preventDefault();
+				event.stopPropagation();
+				
+				// Si le module est chargé, l'utiliser immédiatement
+				if (window._handleFormSubmitModule) {
+					console.log('✅ Module disponible, traitement immédiat');
+					window._handleFormSubmitModule(event);
+				} else {
+					console.log('⏳ Module pas encore chargé, mise en file d\'attente...');
+					// Mettre en file d'attente
+					window._formSubmitQueue.push(event);
+					// Attendre que le module se charge
+					waitForModule(event);
+				}
+				return false;
+			};
+			
+			// Intercepter le formulaire dès que possible
+			(function() {
+				function interceptForm() {
+					const form = document.getElementById('addCarForm');
+					if (form) {
+						console.log('✅ Formulaire trouvé, interception active');
+						
+						// Double protection : addEventListener et onsubmit
+						form.addEventListener('submit', function(e) {
+							console.log('🛑 addEventListener : Interception de la soumission');
+							e.preventDefault();
+							e.stopPropagation();
+							e.stopImmediatePropagation();
+							window.handleFormSubmitGlobal(e);
+							return false;
+						}, true); // Capture phase - intercepte AVANT tout
+						
+						// Protection onsubmit
+						form.onsubmit = function(e) {
+							console.log('🛑 onsubmit : Interception de la soumission');
+							e.preventDefault();
+							e.stopPropagation();
+							window.handleFormSubmitGlobal(e);
+							return false;
+						};
+						
+						// Attacher un gestionnaire de clic au bouton submit
+						const submitButton = document.getElementById('submitButton');
+						if (submitButton) {
+							console.log('✅ Bouton submit trouvé, attachement du gestionnaire de clic');
+							submitButton.addEventListener('click', function(e) {
+								console.log('🖱️ Clic sur le bouton submit');
+								e.preventDefault();
+								
+								// Créer un événement submit artificiel
+								const submitEvent = new Event('submit', {
+									bubbles: true,
+									cancelable: true
+								});
+								
+								// Déclencher l'événement submit sur le formulaire
+								form.dispatchEvent(submitEvent);
+							});
+						}
+					} else {
+						// Réessayer après un court délai
+						setTimeout(interceptForm, 100);
+					}
+				}
+				
+				// Essayer immédiatement et aussi après le chargement du DOM
+				if (document.readyState === 'loading') {
+					document.addEventListener('DOMContentLoaded', interceptForm);
+				} else {
+					interceptForm();
+				}
+			})();
+		</script>
+		
 		<script type="module" src="./js/script.js"></script>
 	</body>
 </html>

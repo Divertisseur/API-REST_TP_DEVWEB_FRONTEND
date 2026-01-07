@@ -1,24 +1,34 @@
-import { API_BASE_URL, API_KEY } from "./config.js";
+import { API_BASE_URL, API_KEY, fetchWithAuth, API_CONFIG } from "./config.js";
 
-// Fonction utilitaire pour gérer les erreurs de fetch avec timeout
+// Log de démarrage pour vérifier que le script se charge
+console.log("🚀 Script script.js chargé et initialisé");
+
+// Définir immédiatement la fonction globale pour la soumission du formulaire
+// Cette fonction temporaire sera remplacée plus tard
+window._handleFormSubmitModule = function(event) {
+	console.log("⚠️ Module en cours de chargement, fonction temporaire appelée");
+	// La fonction sera remplacée plus bas dans le fichier
+	if (window._realHandleFormSubmit) {
+		window._realHandleFormSubmit(event);
+	} else {
+		console.warn("⏳ La vraie fonction n'est pas encore disponible, attente...");
+		// Mettre en file d'attente
+		if (!window._formSubmitQueue) {
+			window._formSubmitQueue = [];
+		}
+		window._formSubmitQueue.push(event);
+	}
+};
+
+// Fonction utilitaire pour gérer les erreurs de fetch avec timeout (GET uniquement)
 async function fetchWithErrorHandling(url, timeout = 30000) {
 	try {
 		console.log("Fetch vers:", url);
 		
-		// Créer un AbortController pour le timeout
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), timeout);
+		const response = await fetchWithAuth(url, {
+			method: 'GET'
+		}, timeout);
 		
-		const response = await fetch(url, {
-			signal: controller.signal,
-			method: 'GET',
-			headers: {
-				'Accept': 'application/json',
-				'x-api-key': API_KEY,
-			}
-		});
-		
-		clearTimeout(timeoutId);
 		console.log("Status de la réponse:", response.status, response.statusText);
 
 		// Vérifier si la réponse est OK (status 200-299)
@@ -269,5 +279,378 @@ async function loadCars() {
 	}
 }
 
+// ============================================
+// FONCTIONS DE VALIDATION
+// ============================================
+
+/**
+ * Valide les données d'une voiture avant envoi à l'API
+ * @param {object} data - Données de la voiture à valider
+ * @returns {object} - { isValid: boolean, errors: string[] }
+ */
+function validateCarData(data) {
+	const errors = [];
+	const currentYear = new Date().getFullYear();
+
+	// Vérifier les champs requis
+	if (!data.brand || data.brand.trim() === '') {
+		errors.push('La marque est requise');
+	}
+
+	if (!data.model || data.model.trim() === '') {
+		errors.push('Le modèle est requis');
+	}
+
+	if (!data.year) {
+		errors.push('L\'année est requise');
+	} else {
+		const yearNum = parseInt(data.year);
+		if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear) {
+			errors.push(`L'année doit être entre 1900 et ${currentYear}`);
+		}
+	}
+
+	if (!data.color || data.color.trim() === '') {
+		errors.push('La couleur est requise');
+	}
+
+	if (!data.price) {
+		errors.push('Le prix est requis');
+	} else {
+		const priceNum = parseFloat(data.price);
+		if (isNaN(priceNum) || priceNum < 0) {
+			errors.push('Le prix doit être un nombre positif');
+		}
+	}
+
+	if (!data.mileage) {
+		errors.push('Le kilométrage est requis');
+	} else {
+		const mileageNum = parseInt(data.mileage);
+		if (isNaN(mileageNum) || mileageNum < 0) {
+			errors.push('Le kilométrage doit être un nombre positif');
+		}
+	}
+
+	// Vérifier l'URL de l'image si fournie
+	if (data.imageUrl && data.imageUrl.trim() !== '') {
+		try {
+			new URL(data.imageUrl);
+		} catch (e) {
+			errors.push('L\'URL de l\'image n\'est pas valide');
+		}
+	}
+
+	return {
+		isValid: errors.length === 0,
+		errors: errors
+	};
+}
+
+/**
+ * Affiche les erreurs de validation dans le formulaire
+ * @param {string[]} errors - Liste des erreurs à afficher
+ */
+function displayValidationErrors(errors) {
+	// Afficher les erreurs dans l'alerte globale
+	const errorAlert = document.getElementById('formErrorAlert');
+	if (errorAlert && errors.length > 0) {
+		errorAlert.classList.remove('d-none');
+		errorAlert.innerHTML = `
+			<strong>Erreurs de validation :</strong>
+			<ul class="mb-0">
+				${errors.map(error => `<li>${error}</li>`).join('')}
+			</ul>
+		`;
+	}
+
+	// Marquer les champs en erreur (optionnel, on se concentre sur l'alerte globale)
+	const form = document.getElementById('addCarForm');
+	if (form) {
+		// Supprimer les classes d'erreur précédentes
+		form.querySelectorAll('.is-invalid').forEach(el => {
+			el.classList.remove('is-invalid');
+		});
+	}
+}
+
+/**
+ * Cache les alertes d'erreur et de succès
+ */
+function clearAlerts() {
+	const errorAlert = document.getElementById('formErrorAlert');
+	const successAlert = document.getElementById('formSuccessAlert');
+	if (errorAlert) errorAlert.classList.add('d-none');
+	if (successAlert) successAlert.classList.add('d-none');
+}
+
+// ============================================
+// FONCTIONS API - CRÉATION DE VOITURE
+// ============================================
+
+/**
+ * Crée une nouvelle voiture via l'API
+ * @param {object} carData - Données de la voiture à créer
+ * @returns {Promise<object|null>} - La voiture créée ou null en cas d'erreur
+ */
+async function createCar(carData) {
+	try {
+		const url = `${API_CONFIG.BASE_URL}/api/cars`;
+		console.log("Création d'une voiture:", carData);
+
+		const response = await fetchWithAuth(url, {
+			method: 'POST',
+			body: JSON.stringify(carData)
+		});
+
+		console.log("Status de la réponse:", response.status, response.statusText);
+
+		if (!response.ok) {
+			let errorMessage = `Erreur HTTP: ${response.status}`;
+			try {
+				const errorData = await response.json();
+				errorMessage = errorData.error || errorData.message || errorMessage;
+			} catch (e) {
+				// Si on ne peut pas parser le JSON, utiliser le message par défaut
+			}
+
+			if (response.status === 401 || response.status === 403) {
+				throw new Error("Non autorisé: Vérifiez votre clé API");
+			} else if (response.status === 400) {
+				throw new Error(`Erreur de validation: ${errorMessage}`);
+			} else if (response.status === 500) {
+				throw new Error("Erreur serveur (500)");
+			} else {
+				throw new Error(errorMessage);
+			}
+		}
+
+		const data = await response.json();
+		
+		// L'API peut retourner { success: true, data: {...} } ou directement l'objet
+		const newCar = data.data || data;
+		console.log("Voiture créée avec succès:", newCar);
+		return newCar;
+
+	} catch (error) {
+		console.error('Erreur lors de la création de la voiture:', error);
+		
+		// Gérer les erreurs réseau
+		if (error instanceof TypeError && error.message.includes("fetch")) {
+			throw new Error("Erreur réseau: Impossible de contacter le serveur. Vérifiez votre connexion internet.");
+		}
+		
+		// Propager les autres erreurs
+		throw error;
+	}
+}
+
+// ============================================
+// GESTION DU FORMULAIRE
+// ============================================
+
+/**
+ * Ferme le modal Bootstrap
+ */
+function closeModal() {
+	const modalElement = document.getElementById('exampleModal');
+	if (modalElement) {
+		const modal = bootstrap.Modal.getInstance(modalElement);
+		if (modal) {
+			modal.hide();
+		}
+	}
+}
+
+/**
+ * Réinitialise le formulaire
+ */
+function resetForm() {
+	const form = document.getElementById('addCarForm');
+	if (form) {
+		form.reset();
+		// Supprimer les classes d'erreur
+		form.querySelectorAll('.is-invalid').forEach(el => {
+			el.classList.remove('is-invalid');
+		});
+		clearAlerts();
+	}
+}
+
+/**
+ * Gère la soumission du formulaire
+ * @param {Event} event - Événement de soumission
+ */
+async function handleFormSubmit(event) {
+	// Si cette fonction est appelée, on sait que le module est chargé
+	if (!window._realHandleFormSubmit) {
+		window._realHandleFormSubmit = handleFormSubmit;
+	}
+	event.preventDefault(); // Empêcher le rechargement de la page
+	event.stopPropagation(); // Empêcher la propagation de l'événement
+	
+	console.log("Formulaire soumis, interception de l'événement");
+
+	const form = event.target;
+	const submitButton = document.getElementById('submitButton');
+
+	// Effacer les alertes précédentes
+	clearAlerts();
+
+	// Désactiver le bouton pour éviter les doubles soumissions
+	if (submitButton) {
+		const originalText = submitButton.textContent;
+		submitButton.disabled = true;
+		submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Envoi en cours...';
+		
+		try {
+			// 1. Récupérer les données du formulaire
+			const formData = new FormData(form);
+			const carData = Object.fromEntries(formData);
+
+			// 2. Convertir les types de données
+			carData.year = parseInt(carData.year);
+			carData.price = parseFloat(carData.price);
+			carData.mileage = parseInt(carData.mileage);
+
+			// Nettoyer les chaînes vides pour les champs optionnels
+			if (!carData.description || carData.description.trim() === '') {
+				delete carData.description;
+			}
+			if (!carData.imageUrl || carData.imageUrl.trim() === '') {
+				delete carData.imageUrl;
+			}
+
+			// 3. Valider les données
+			const validation = validateCarData(carData);
+			if (!validation.isValid) {
+				displayValidationErrors(validation.errors);
+				// Réactiver le bouton avant de retourner
+				if (submitButton) {
+					submitButton.disabled = false;
+					submitButton.textContent = originalText;
+				}
+				return;
+			}
+
+			// 4. Envoyer à l'API
+			const newCar = await createCar(carData);
+
+			// 5. Gérer le succès
+			if (newCar) {
+				// Afficher un message de succès
+				const successAlert = document.getElementById('formSuccessAlert');
+				if (successAlert) {
+					successAlert.classList.remove('d-none');
+					successAlert.textContent = `✓ La voiture "${carData.brand} ${carData.model}" a été ajoutée avec succès !`;
+				}
+
+				// Réinitialiser le formulaire
+				resetForm();
+
+				// Fermer le modal après un court délai
+				setTimeout(() => {
+					closeModal();
+					// Rafraîchir la liste des voitures
+					loadCars();
+				}, 1500);
+			}
+
+		} catch (error) {
+			// Afficher l'erreur
+			const errorAlert = document.getElementById('formErrorAlert');
+			if (errorAlert) {
+				errorAlert.classList.remove('d-none');
+				errorAlert.textContent = `Erreur: ${error.message}`;
+			}
+			console.error('Erreur lors de la soumission:', error);
+		} finally {
+			// Réactiver le bouton
+			if (submitButton) {
+				submitButton.disabled = false;
+				submitButton.textContent = originalText;
+			}
+		}
+	}
+}
+
+// ============================================
+// FONCTION GLOBALE POUR L'INTERCEPTION DU FORMULAIRE
+// ============================================
+
+// Remplacer la fonction globale temporaire par la vraie fonction
+window._realHandleFormSubmit = handleFormSubmit;
+window._handleFormSubmitModule = function(event) {
+	console.log("🔵 Module : Traitement de la soumission du formulaire");
+	handleFormSubmit(event);
+};
+
+// Traiter la file d'attente si elle existe
+if (window._formSubmitQueue && window._formSubmitQueue.length > 0) {
+	console.log("📦 Traitement de la file d'attente au chargement du module");
+	window._formSubmitQueue.forEach(event => {
+		window._handleFormSubmitModule(event);
+	});
+	window._formSubmitQueue = [];
+}
+
+// Garder aussi handleFormSubmitGlobal pour compatibilité
+window.handleFormSubmitGlobal = window._handleFormSubmitModule;
+
+console.log("✅ Module script.js chargé, _handleFormSubmitModule disponible");
+
+// ============================================
+// INITIALISATION
+// ============================================
+
 // Charger les voitures au chargement de la page
-document.addEventListener("DOMContentLoaded", loadCars);
+document.addEventListener("DOMContentLoaded", () => {
+	loadCars();
+
+	// Utiliser la délégation d'événements pour capturer la soumission du formulaire
+	// Cela fonctionne même si le formulaire est dans un modal chargé dynamiquement
+	document.addEventListener('submit', function(e) {
+		const form = e.target;
+		if (form && form.id === 'addCarForm') {
+			console.log("✓ Événement submit intercepté pour le formulaire #addCarForm");
+			e.preventDefault();
+			e.stopPropagation();
+			handleFormSubmit(e);
+		}
+	}, true); // Utiliser capture phase pour intercepter avant Bootstrap
+
+	// Attacher l'événement directement aussi (au cas où)
+	const form = document.getElementById('addCarForm');
+	if (form) {
+		console.log("✓ Formulaire trouvé au chargement, attachement direct de l'événement");
+		form.addEventListener('submit', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			handleFormSubmit(e);
+		});
+	}
+
+	// Attacher l'événement quand le modal est montré (Bootstrap event)
+	const modalElement = document.getElementById('exampleModal');
+	if (modalElement) {
+		// Réinitialiser le formulaire quand le modal est fermé
+		modalElement.addEventListener('hidden.bs.modal', resetForm);
+		
+		// S'assurer que l'événement est attaché quand le modal s'ouvre
+		modalElement.addEventListener('shown.bs.modal', function() {
+			const form = document.getElementById('addCarForm');
+			if (form) {
+				console.log("✓ Formulaire trouvé lors de l'ouverture du modal");
+				// L'événement est déjà attaché via la délégation, mais on peut ajouter une protection
+				if (!form.hasAttribute('data-event-attached')) {
+					form.setAttribute('data-event-attached', 'true');
+					form.addEventListener('submit', function(e) {
+						e.preventDefault();
+						e.stopPropagation();
+						handleFormSubmit(e);
+					});
+				}
+			}
+		});
+	}
+});
