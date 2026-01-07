@@ -114,13 +114,36 @@ function createCarCard(car) {
 
 	// 3. Créer l'image
 	const image = document.createElement("img");
-	image.src = imageUrl;
-	image.className = "card-img-top object-fit-fill";
+	image.className = "card-img-top object-fit-cover";
 	image.alt = `${brand} ${model}`;
+	image.style.width = "100%";
+	image.style.height = "235px";
+	image.style.objectFit = "cover";
+	image.loading = "lazy"; // Chargement paresseux pour améliorer les performances
+	
+	// Gérer le chargement de l'image avec meilleure gestion d'erreur
+	image.onload = function() {
+		console.log(`✅ Image chargée avec succès: ${imageUrl}`);
+	};
+	
 	// Gérer l'erreur de chargement d'image
 	image.onerror = function() {
-		this.src = "./imgs/classic-cars.jpg";
+		console.warn(`⚠️ Erreur de chargement d'image: ${imageUrl}`);
+		console.warn(`⚠️ URL tentée: ${this.src}`);
+		// Ne remplacer que si ce n'est pas déjà l'image par défaut
+		const defaultImgPath = new URL("./imgs/classic-cars.jpg", window.location.href).href;
+		if (this.src !== defaultImgPath && !this.src.includes('classic-cars.jpg')) {
+			console.log(`🔄 Remplacement par l'image par défaut`);
+			this.src = "./imgs/classic-cars.jpg";
+		}
 	};
+	
+	// Définir la source après avoir configuré les handlers
+	console.log(`🖼️ Tentative de chargement d'image: ${imageUrl}`);
+	image.src = imageUrl;
+	
+	// Ajouter un attribut pour le débogage
+	image.setAttribute('data-original-src', imageUrl);
 
 	// Ajouter l'image au lien
 	imageLink.appendChild(image);
@@ -284,6 +307,14 @@ async function loadCars() {
 		
 		// Créer et ajouter les cartes pour chaque voiture
 		response.data.forEach((car) => {
+			console.log(`📦 Données de la voiture:`, {
+				id: car.id,
+				brand: car.brand,
+				model: car.model,
+				image_url: car.image_url,
+				imageUrl: car.imageUrl,
+				imageUrl_final: car.image_url || car.imageUrl || "./imgs/classic-cars.jpg"
+			});
 			const card = createCarCard(car);
 			fragment.appendChild(card);
 		});
